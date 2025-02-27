@@ -1,0 +1,28 @@
+# compile verilog/system verilog design source files
+verilog xil_defaultlib  \
+"../../../../manager_unit.srcs/sources_1/new/address_translator.v" \
+"../../../../manager_unit.srcs/sources_1/new/compressor.v" \
+"../../../../manager_unit.srcs/sources_1/new/control_unit.v" \
+"../../../../manager_unit.srcs/sources_1/new/pointer_translator.v" \
+"../../../../manager_unit.srcs/sources_1/new/pscb_gen_node.v" \
+"../../../../manager_unit.srcs/sources_1/new/pscb_gen_stage.v" \
+"../../../../manager_unit.srcs/sources_1/new/pscb_gen_tree.v" \
+"../../../../manager_unit.srcs/sources_1/new/quick_page.v" \
+"../../../../manager_unit.srcs/sources_1/new/rscb_gen_node.v" \
+"../../../../manager_unit.srcs/sources_1/new/rscb_gen_stage.v" \
+"../../../../manager_unit.srcs/sources_1/new/rscb_gen_tree.v" \
+"../../../../manager_unit.srcs/sources_1/new/scb_file.v" \
+"../../../../manager_unit.srcs/sources_1/new/switch_down.v" \
+"../../../../manager_unit.srcs/sources_1/new/switch_dstage.v" \
+"../../../../manager_unit.srcs/sources_1/new/switch_node.v" \
+"../../../../manager_unit.srcs/sources_1/new/switch_up.v" \
+"../../../../manager_unit.srcs/sources_1/new/switch_ustage.v" \
+
+sv xil_defaultlib  \
+"../../../../manager_unit.srcs/sim_1/new/quick_page_tb.sv" \
+
+# compile glbl module
+verilog xil_defaultlib "glbl.v"
+
+# Do not sort compile order
+nosort
