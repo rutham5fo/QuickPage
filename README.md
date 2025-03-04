@@ -23,11 +23,11 @@ The below diagram briefly explains the concept behind QuickPage. A more thorough
 prepared, but due to time constraints on my end, I appologize and encourage readers to go through the code 
 and decompose the architecutre.
 
-![Conceptual brief of pointer map and inverse butterfly structure](pointer_map_concept.png)
+![Conceptual brief of pointer map and inverse butterfly structure](imgs/pointer_map_concept.png)
 
 ## System Overview
 
-![System_overview](quick_page_overview.png)
+![System_overview](imgs/quick_page_overview.png)
 
 The manager unit encompases the (De)Allocator, Address translator Channel(s) and necessary modules to 
 manage the page table. QuickPage provides multiple user controllable parameters, whose functionality are 
