@@ -39,14 +39,11 @@ explained below along with I/O in the following tables.\
 | :---------------- | :------------------------------------------------------------------------------------------------------ |
 | REG_INPUTS        | Register all inputs.                                                                                    |
 | REG_MEMORY        | Register outputs (translated addresses) to memory module.                                               |
-| CHANS             | Number of independent address translator modules / channels. All channels and sub-channels \
-                      indicate only the address path, the memory data path is not part of the QuickPage framework \
-                      and depends on the implemented memory module and interconnect as shown in the system overview diagram.  |
+| CHANS             | Number of independent address translator modules / channels. All channels and sub-channels<br/> indicate only the address path, the memory data path is not part of the QuickPage framework<br/> and depends on the implemented memory module and interconnect as shown in the system overview diagram.  |
 | LSUS              | Number of independent Load / Store unit sub-cahnnels supported per translator channel.                  |
 | LINE_S            | Size of an allocable page / line in bytes.                                                              |
 | MEM_D             | Total heap memory depth, i.e., the total number of allocable lines / frames in the heap.                |
-| BLOCK_D           | Total number of lines per block, i.e., the span of lines over which an object may be \
-                      dynamically allocated. This parameter controls the size of the inverse butterfly structure.             |
+| BLOCK_D           | Total number of lines per block, i.e., the span of lines over which an object may be<br/> dynamically allocated. This parameter controls the size of the inverse butterfly structure.             |
 | ROW_ADDR_LATENCY  | Adjust the translation latency of all channels and sub-channels (valid values are 1 and 2).             |
 
 The following are non-mutable parameters which are automatically derived from the above parameter values.\
