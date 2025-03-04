@@ -7,16 +7,16 @@ This leads to inefficient memory performance in workload agnostic scenarios, suc
 where the processed data exhibits very good spatial locality and poor temporal locality. The workload seen 
 by the Processing unit (PU), in turn the memory subsystem, is very dependent on the sparsity of the row.
 For now, a more detailed reasoning towards the necessity of Dyanmic Memory Allocation in LLC can be found by 
-looking at my previous projects "VDMMU" and "SpGEMM_Accelerator" under my GitHub page.\
+looking at my previous projects "VDMMU" and "SpGEMM_Accelerator" under my GitHub page.
 
 Accelerators profit from low latency and parallel operations. Hence, QuickPage is an attempt to provide a 
 memory framework that supports:\
 &emsp; (1) Low latency allocation with O(1) time complexity (3 cycles for valid reply, pipelined).\
 &emsp; (2) Low latency deallocation with O(1) time complexity (5 cycles for valid reply, pipelined).\
-&emsp; (3) Low latency virtual to physical address translation. This metric is a bit tricky to quantify, 
-           at the moment the translator is capable of supporting 1~2 cycle latency for translating addresses 
+&emsp; (3) Low latency virtual to physical address translation. This metric is a bit tricky to quantify, \ 
+           at the moment the translator is capable of supporting 1~2 cycle latency for translating addresses \ 
            within a block (a set of frames), plus the added single cycle latency to switch between blocks.\
-&emsp; (4) Support for multiple concurrent translation ports that are scalable, to support multiple PUs.\
+&emsp; (4) Support for multiple concurrent translation ports that are scalable, to support multiple PUs.
 
 ## Concept
 The below diagram briefly explains the concept behind QuickPage. A more thorough documentation will be 
