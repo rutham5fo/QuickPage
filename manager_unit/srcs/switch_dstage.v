@@ -21,7 +21,6 @@
 
 
 module switch_dstage #(
-        //parameter TEST_EN           = 0,
         parameter PIPELINE          = 1,
         parameter STAGE_NUM         = 0,
         parameter INPUTS            = 32,
@@ -44,31 +43,6 @@ module switch_dstage #(
     wire    [DATA_W-1:0]        data_out_unpkd[0:INPUTS-1];
     
     genvar i;
-    
-    // Test wires
-    //generate
-    //    if (TEST_EN >= 2) begin                  : BUTTERFLY_STAGE_TEST_EN
-    //        integer k;
-    //        always @(*) begin
-    //            $write("%t: STAGE[%0d] ||| addr_in = {|", $time, STAGE_NUM);
-    //            for (k = 0; k < INPUTS; k = k+1) begin
-    //                $write(" [%0d]%0d |", k, addr_in_unpkd[k]);
-    //            end
-    //            $display("}");
-    //            $write("%t: STAGE[%0d] ||| i_addr_out = {|", $time, STAGE_NUM);
-    //            for (k = 0; k < INPUTS; k = k+1) begin
-    //                $write(" [%0d]%0d |", k, r_addr_out[k]);
-    //            end
-    //            $display("}");
-    //            $write("%t: STAGE[%0d] ||| addr_out = {|", $time, STAGE_NUM);
-    //            for (k = 0; k < INPUTS; k = k+1) begin
-    //                $write(" [%0d]%0d |", k, addr_out_unpkd[k]);
-    //            end
-    //            $display("}");
-    //        end
-    //    end
-    //endgenerate
-    //--------------------------------------------
     
     // Packed to unpacked
     generate

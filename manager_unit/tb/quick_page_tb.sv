@@ -28,7 +28,8 @@ module quick_page_tb;
     
     parameter REG_INPUTS            = 0;
     parameter REG_MEMORY            = 0;
-    parameter LSUS                  = 4;                            // Number of load/store units
+    parameter CHANS                 = 1;                            // Number of load/store units
+    parameter SUBS                  = 1;
     parameter LINE_S                = 4;                          // Number of bytes per line
     parameter MEM_D                 = 32;                          // Number of lines in heap
     parameter BLOCK_D               = 8;                          // Number of lines per block in heap / Search space
@@ -40,10 +41,12 @@ module quick_page_tb;
     parameter REP_W                 = BLOCK_L + 3*BLOCK_W + 1;  // Reply width is composite obj_id (MSBs indicate block_id of object) + allocated size + reserved space for virtual offset
     parameter VADDR_W               = REP_W;
     parameter PADDR_W               = BLOCK_L + BLOCK_W;
-    parameter ROW_ADDR_LATENCY      = 2;
+    parameter ASSOC_D               = 2;
+    parameter ASSOC_W               = $clog2(ASSOC_D);
     
     parameter MAX_OBJ               = 20;
-    parameter LSU_W                 = $clog2(LSUS);
+    parameter SUB_W                 = (SUBS == 1) ? 1 : $clog2(SUBS);
+    parameter CHAN_W                = (CHANS == 1) ? 1 : $clog2(CHANS);
     
     parameter f_IDLE                = 2'b00;
     parameter f_ALLOC               = 2'b01;
@@ -54,17 +57,18 @@ module quick_page_tb;
     wire                            w_rep_alloc_vld;
     wire                            w_rep_dealloc_vld;
     wire    [REP_W-1:0]             w_rep_data;
-    wire    [VADDR_W*LSUS-1:0]      w_virt_addr;
-    wire    [PADDR_W*LSUS-1:0]      w_mem_addr;
+    wire    [VADDR_W*SUBS-1:0]      w_virt_addr;
+    wire    [PADDR_W*SUBS-1:0]      w_mem_addr;
+    wire    [CHANS-1:0]             w_mem_update;
     
     wire    [BLOCK_L-1:0]           w_rep_data_block;
     wire    [BLOCK_W-1:0]           w_rep_data_obj;
     wire    [BLOCK_W:0]             w_rep_data_size;
     wire    [BLOCK_W-1:0]           w_rep_data_offset;
     
-    wire    [PADDR_W-1:0]           w_lsu_mem_chan_addr[0:LSUS-1];
-    wire    [BLOCK_L-1:0]           w_lsu_mem_chan_block[0:LSUS-1];
-    wire    [BLOCK_W-1:0]           w_lsu_mem_chan_offset[0:LSUS-1];
+    wire    [PADDR_W-1:0]           w_lsu_mem_chan_addr[0:SUBS-1];
+    wire    [BLOCK_L-1:0]           w_lsu_mem_chan_block[0:SUBS-1];
+    wire    [BLOCK_W-1:0]           w_lsu_mem_chan_offset[0:SUBS-1];
     
     reg                             s_clk;
     reg                             s_reset;
@@ -72,7 +76,7 @@ module quick_page_tb;
     reg     [1:0]                   s_req_func;             // 00 - IDLE, 01 - ALLOC, 10 - DEALLOC, 11 - RESERVED
     reg     [REQ_W-1:0]             s_req_alloc_size;       // size in bytes
     reg     [REP_W-1:0]             s_req_dealloc_data;
-    reg     [VADDR_W-1:0]           s_virt_addr[0:LSUS-1];
+    reg     [VADDR_W-1:0]           s_virt_addr[0:SUBS-1];
     
     reg     [REP_W-1:0]             r_obj[0:MAX_OBJ-1];
     
@@ -107,11 +111,13 @@ module quick_page_tb;
     endtask
     
     task get_addr (
-        input [LSU_W-1:0]       chan_sel,
+        input [CHAN_W-1:0]      chan_sel,
         input [VADDR_W-1:0]     obj_addr,
         input [BLOCK_W-1:0]     offset
     );
         s_virt_addr[chan_sel] = obj_addr + offset;
+        @(posedge s_clk);                                   // Hold sigs for a cycle
+        #WR_DLY;
     endtask
     
     // Break down rep_data
@@ -123,7 +129,7 @@ module quick_page_tb;
     assign w_rep_global_obj = {w_rep_data_block, w_rep_data_obj};
     
     generate
-        for (i = 0; i < LSUS; i = i+1) begin            :   gen_lsu_virt_addr
+        for (i = 0; i < SUBS; i = i+1) begin            :   gen_lsu_virt_addr
             assign w_virt_addr[i*VADDR_W +: VADDR_W] = s_virt_addr[i];
             assign w_lsu_mem_chan_addr[i] = w_mem_addr[i*PADDR_W +: PADDR_W];
             assign w_lsu_mem_chan_block[i] = w_lsu_mem_chan_addr[i][BLOCK_W +: BLOCK_L];
@@ -134,7 +140,8 @@ module quick_page_tb;
     quick_page #(
         .REG_INPUTS(REG_INPUTS),
         .REG_MEMORY(REG_MEMORY),
-        .LSUS(LSUS),                            // Number of load/store unit channels
+        .CHANS(CHANS),                            // Number of load/store unit channels
+        .SUBS(SUBS),
         .LINE_S(LINE_S),                          // Number of bytes per line
         .MEM_D(MEM_D),                          // Number of lines in heap
         .BLOCK_D(BLOCK_D),                          // Number of lines per block in heap / Search space
@@ -146,7 +153,8 @@ module quick_page_tb;
         .REP_W(REP_W),    // Reply width is composite obj_id (MSBs indicate block_id of object) + allocated size
         .VADDR_W(VADDR_W),
         .PADDR_W(PADDR_W),
-        .ROW_ADDR_LATENCY(ROW_ADDR_LATENCY)
+        .ASSOC_D(ASSOC_D),
+        .ASSOC_W(ASSOC_W)
     ) quickie_i (
         .i_clk(s_clk),
         .i_reset(s_reset),
@@ -160,6 +168,7 @@ module quick_page_tb;
         .o_rep_alloc_vld(w_rep_alloc_vld),        // 1 for valid reply
         .o_rep_dealloc_vld(w_rep_dealloc_vld),      // 1 for valid dealloc
         .o_rep_data(w_rep_data),             // Block_id + Obj_id + Size = object
+        .o_mem_update(w_mem_update),
         .o_mem_addr(w_mem_addr)          // Unregistered, goes to BRAM modules
     );
     
@@ -174,7 +183,7 @@ module quick_page_tb;
         s_req_func = f_IDLE;
         s_req_alloc_size = 0;
         s_req_dealloc_data = 0;
-        for (k = 0; k < LSUS; k = k+1) begin
+        for (k = 0; k < SUBS; k = k+1) begin
             s_virt_addr[k] = 0;
         end
         for (k = 0; k < MAX_OBJ; k = k+1) begin
@@ -202,8 +211,11 @@ module quick_page_tb;
         // Alloc 3 ->   Size = 1 line           || Triggers block_overflow (block_full)
         alloc (3, LINE_S);
         
+        // The below tb is designed to test quick_page with un-piped alloc responeses
+        // This is due to the rudementary design of tb to recieve replies from allocator
+        
         // Dealloc 1 -> Obj = Alloc 1
-        dealloc (r_obj[1]);                     // Comment out for dealloc piped test
+        //dealloc (r_obj[1]);
         
         // Alloc 4 ->   Size = 8 lines          || Trigger block overflow
         alloc (4, 8*LINE_S);
@@ -215,18 +227,26 @@ module quick_page_tb;
         alloc (6, LINE_S);
         
         // Address Translator tests
-        get_addr (0, r_obj[5], 1);
-        get_addr (1, r_obj[0], 3);
-        get_addr (2, r_obj[6], 0);
+        get_addr (0, r_obj[1], 1);
+        //get_addr (1, r_obj[0], 3);
+        //get_addr (2, r_obj[6], 0);
         
-        #(CLK_PERIOD*3);                        // 3 cycle latency due to Block addr change
+        #(CLK_PERIOD*3);                        // 3 cycle latency due to Block addr change + Set select + reg_Load
         
-        get_addr (1, r_obj[0], 0);
-        
-        #(CLK_PERIOD*2);                        // 2 cycle latency due to row/line addr change
+        get_addr (0, r_obj[1], 0);              // 0 cycle latency due to only assoc_sel change
         
         // Dealloc 2 -> Obj = Alloc 0
-        dealloc (r_obj[0]);                   //  Comment out for dealloc piped test
+        dealloc (r_obj[0]);
+        
+        #(CLK_PERIOD*1);
+        
+        get_addr (0, r_obj[3], 0);
+        
+        #(CLK_PERIOD*2);                        // 2 cycle latency due to Set_sel + reg_load
+        
+        get_addr (0, r_obj[1], 2);
+        
+        #(CLK_PERIOD*2);                        // 2 cycle latency due to Set_sel + reg_load
         
         // Piped dealloc test
         

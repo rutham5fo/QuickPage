@@ -21,7 +21,6 @@
 
 
 module switch_up #(
-        //parameter TEST_EN           = 0,
         parameter PIPELINE          = 0,
         parameter INPUTS            = 128,
         parameter NODES             = INPUTS/2,
@@ -38,21 +37,13 @@ module switch_up #(
     
     wire    [DATA_W*INPUTS-1:0]         stage_data_out[0:STAGES-1];
     wire    [NODES-1:0]                 stage_scb_unpkd[0:STAGES-1];
-        
-    //reg     [NODES*STAGES-1:0]          r_scb_reg;
-    //reg     [DATA_W*INPUTS-1:0]         ri_data_reg;
-    //reg     [DATA_W*INPUTS-1:0]         ro_data_reg;
-            
+          
     genvar i;
     
-    //integer j;
-    
-    //assign o_data = ro_data_reg;
     assign o_data = stage_data_out[0];
     
     generate
         for (i = 0; i < STAGES; i = i+1) begin      :   gen_unpkd_scb
-            //assign stage_scb_unpkd[i] = r_scb_reg[i*NODES +: NODES];
             assign stage_scb_unpkd[i] = i_scb[i*NODES +: NODES];
         end
     endgenerate
@@ -61,7 +52,6 @@ module switch_up #(
         for (i = 0; i < STAGES; i = i+1) begin      :   gen_butt_stage
             if (i == STAGES-1) begin
                 switch_ustage #(
-                    //.TEST_EN(TEST_EN),
                     .PIPELINE(PIPELINE),
                     .STAGE_NUM(i),
                     .INPUTS(INPUTS),
@@ -71,7 +61,6 @@ module switch_up #(
                 ) switch_ustage_i (
                     .i_clk(i_clk),
                     .i_reset(i_reset),
-                    //.i_data(ri_data_reg),
                     .i_data(i_data),
                     .i_scb(stage_scb_unpkd[i]),
                     
@@ -80,7 +69,6 @@ module switch_up #(
             end
             else begin
                 switch_ustage #(
-                    //.TEST_EN(TEST_EN),
                     .PIPELINE(PIPELINE),
                     .STAGE_NUM(i),
                     .INPUTS(INPUTS),
@@ -98,11 +86,5 @@ module switch_up #(
             end
         end
     endgenerate
-    
-    //always @(posedge i_clk) begin
-        //r_scb_reg <= i_scb;
-        //ri_data_reg <= i_data;
-        //ro_data_reg <= stage_data_out[0];
-    //end
     
 endmodule

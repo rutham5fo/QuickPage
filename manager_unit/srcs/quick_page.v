@@ -19,23 +19,25 @@
 // 
 //////////////////////////////////////////////////////////////////////////////////
 
+
 module quick_page #(
         parameter REG_INPUTS            = 0,
         parameter REG_MEMORY            = 0,
-        parameter CHANS                 = 1,                            // Number of independent translator channels
-        parameter LSUS                  = 8,                            // Number of load/store units per channel
+        parameter CHANS                 = 2,                            // Number of independent translator channels
+        parameter SUBS                  = 8,                            // Number of side (sub) channels dependent on main channel for blk and set select | Value cannot be greater than ASSOC_D-1
         parameter LINE_S                = 256,                          // Number of bytes per line
-        parameter MEM_D                 = 512,                          // Number of lines in heap
-        parameter BLOCK_D               = 256,                          // Number of lines per block in heap / Search space
+        parameter MEM_D                 = 2048,                          // Number of lines in heap
+        parameter BLOCK_D               = 512,                          // Number of lines per block in heap / Search space
         parameter BLOCK_W               = $clog2(BLOCK_D),
+        parameter ASSOC_D               = 32,                        // Associativity / range of buffered phy_ptr location during translation
+        parameter ASSOC_W               = $clog2(ASSOC_D),
         parameter BLOCKS                = MEM_D / BLOCK_D,
         parameter BLOCK_L               = (BLOCKS != 1) ? $clog2(BLOCKS) : 1,
         parameter REQ_S                 = BLOCK_D * LINE_S,             // Max allocable bytes
         parameter REQ_W                 = $clog2(REQ_S) + 1,
         parameter REP_W                 = BLOCK_L + 3*BLOCK_W + 1,  // Reply width is the physical blk + base_addr + size (additional 1 bit for full resolution) + offset (init to 0)
         parameter VADDR_W               = REP_W,
-        parameter PADDR_W               = BLOCK_L + BLOCK_W,
-        parameter ROW_ADDR_LATENCY      = 2                         // Valid values are 1 and 2
+        parameter PADDR_W               = BLOCK_L + BLOCK_W
     )(
         input wire                              i_clk,
         input wire                              i_reset,
@@ -43,13 +45,16 @@ module quick_page #(
         input wire  [1:0]                       i_req_func,             // 00 - idle ; 01 - alloc ; 10 - dealloc ; 11 - reserved;
         input wire  [REQ_W-1:0]                 i_req_alloc_size,       // size of alloc request in bytes
         input wire  [REP_W-1:0]                 i_req_dealloc_data,     // Object (block + obj_id + size) to be deallocated
-        input wire  [VADDR_W*LSUS*CHANS-1:0]    i_virt_addr,        // Virtual address for translation in each LSU channel
+        input wire  [VADDR_W*CHANS-1:0]         i_virt_addr,        // Virtual address for translation in each LSU channel
+        input wire  [ASSOC_W*SUBS*CHANS-1:0]    i_sub_virt_addr,
         
         output wire                             o_busy,                // Backpressure signal for upstream procs | true while updating regs
         output wire                             o_rep_alloc_vld,        // 1 for valid reply
         output wire                             o_rep_dealloc_vld,      // 1 for valid dealloc
         output wire [REP_W-1:0]                 o_rep_data,             // Block_id + Obj_id + Size
-        output wire [PADDR_W*LSUS*CHANS-1:0]    o_mem_addr          // Unregistered, translated physical addreses to BRAM module
+        output wire [CHANS-1:0]                 o_mem_update,       // Held high for a single cycle after the channel has been updated.
+        output wire [PADDR_W*CHANS-1:0]         o_mem_addr,         // Unregistered, translated physical addreses to BRAM module
+        output wire [PADDR_W*SUBS*CHANS-1:0]    o_mem_sub_addr
     );
     
     localparam NODES                = BLOCK_D >> 1;
@@ -78,16 +83,22 @@ module quick_page #(
     wire    [BLOCK_L*CHANS-1:0]         w_chan_scb_addr_pkd;
     wire    [SWITCH_DATA_W-1:0]         w_scb_wr_data;
     
-    wire    [VADDR_W*LSUS-1:0]          w_chan_virt_addr[0:CHANS-1];
-    wire    [PADDR_W*LSUS-1:0]          w_chan_paddr[0:CHANS-1];
+    wire    [VADDR_W-1:0]               w_chan_virt_addr[0:CHANS-1];
+    wire    [ASSOC_W*SUBS-1:0]          w_chan_sub_virt_addr[0:CHANS-1];
+    wire    [PADDR_W-1:0]               w_chan_paddr[0:CHANS-1];
+    wire    [PADDR_W*SUBS-1:0]          w_chan_sub_paddr[0:CHANS-1];
+    wire    [CHANS-1:0]                 w_chan_update;
     
     wire                                wi_req_id;
     wire    [1:0]                       wi_req_func;
     wire    [REQ_W-1:0]                 wi_req_alloc_size;
     wire    [REP_W-1:0]                 wi_req_dealloc_data;
-    wire    [VADDR_W*LSUS*CHANS-1:0]    wi_virt_addr;
+    wire    [VADDR_W*CHANS-1:0]         wi_virt_addr;
+    wire    [ASSOC_W*SUBS*CHANS-1:0]    wi_sub_virt_addr;
     
-    wire    [PADDR_W*LSUS*CHANS-1:0]    wo_mem_addr;
+    wire    [PADDR_W*CHANS-1:0]         wo_mem_addr;
+    wire    [PADDR_W*SUBS*CHANS-1:0]    wo_mem_sub_addr;
+    wire    [CHANS-1:0]                 wo_mem_update;
     
     genvar i;
     
@@ -97,13 +108,15 @@ module quick_page #(
             reg     [1:0]                       ri_req_func;
             reg     [REQ_W-1:0]                 ri_req_alloc_size;
             reg     [REP_W-1:0]                 ri_req_dealloc_data;
-            reg     [VADDR_W*LSUS*CHANS-1:0]    ri_virt_addr;
+            reg     [VADDR_W*CHANS-1:0]         ri_virt_addr;
+            reg     [ASSOC_W*SUBS*CHANS-1:0]    ri_sub_virt_addr;
             
             assign wi_req_id = ri_req_id;
             assign wi_req_func = ri_req_func;
             assign wi_req_alloc_size = ri_req_alloc_size;
             assign wi_req_dealloc_data = ri_req_dealloc_data;
             assign wi_virt_addr = ri_virt_addr;
+            assign wi_sub_virt_addr = ri_sub_virt_addr;
             
             always @(posedge i_clk) begin
                 ri_req_id <= i_req_id;
@@ -111,6 +124,7 @@ module quick_page #(
                 ri_req_alloc_size <= i_req_alloc_size;
                 ri_req_dealloc_data <= i_req_dealloc_data;
                 ri_virt_addr <= i_virt_addr;
+                ri_sub_virt_addr <= i_sub_virt_addr;
             end
         end
         else begin
@@ -119,25 +133,34 @@ module quick_page #(
             assign wi_req_alloc_size = i_req_alloc_size;
             assign wi_req_dealloc_data = i_req_dealloc_data;
             assign wi_virt_addr = i_virt_addr;
+            assign wi_sub_virt_addr = i_sub_virt_addr;
         end
     endgenerate
     
     generate
         if (REG_MEMORY) begin
-            reg     [PADDR_W*LSUS*CHANS-1:0]    r_mem_addr;
+            reg     [PADDR_W*CHANS-1:0]         r_mem_addr;
+            reg     [PADDR_W*SUBS*CHANS-1:0]    r_mem_sub_addr;
+            reg     [CHANS-1:0]                 r_mem_update;
             
             assign o_mem_addr = r_mem_addr;
+            assign o_mem_sub_addr = r_mem_sub_addr;
+            assign o_mem_update = r_mem_update;
             
             always @(posedge i_clk) begin
                 r_mem_addr <= (i_reset) ? 0 : wo_mem_addr;
+                r_mem_sub_addr <= (i_reset) ? 0 : wo_mem_sub_addr;
+                r_mem_update <= (i_reset) ? 0 : wo_mem_update;
             end
         end
         else begin
             assign o_mem_addr = wo_mem_addr;
+            assign o_mem_sub_addr = wo_mem_sub_addr;
+            assign o_mem_update = wo_mem_update;
         end
     endgenerate
     
-    //(* dont_touch = "yes" *)
+    (* dont_touch = "yes" *)
     control_unit #(
         .LINE_S(LINE_S),                          // Number of bytes per line
         .MEM_D(MEM_D),                          // Number of lines in heap
@@ -176,6 +199,7 @@ module quick_page #(
         .o_rep_data(o_rep_data)
     );
     
+    (* dont_touch = "yes" *)
     pointer_translator #(
         .BLOCKS(BLOCKS),
         .BLOCK_D(BLOCK_D),
@@ -197,7 +221,7 @@ module quick_page #(
         .o_dealloc_vptr(w_dealloc_base_addr)
     );
     
-    //(* dont_touch = "yes" *)
+    (* dont_touch = "yes" *)
     scb_file #(
         .CHANS(CHANS),
         .BLOCKS(BLOCKS),
@@ -219,7 +243,7 @@ module quick_page #(
         .o_chan_data(w_chan_rd_scb_pkd)
     );
     
-    //(* dont_touch = "yes" *)
+    (* dont_touch = "yes" *)
     compressor #(
         .BITMAP(BLOCK_D),
         .NODES(NODES),
@@ -245,12 +269,16 @@ module quick_page #(
         
             assign w_chan_scb_addr_pkd[i*BLOCK_L +: BLOCK_L] = w_chan_scb_addr[i];
             assign w_chan_rd_scb[i] = w_chan_rd_scb_pkd[i*SWITCH_DATA_W +: SWITCH_DATA_W];
-            assign w_chan_virt_addr[i] = wi_virt_addr[i*VADDR_W*LSUS +: VADDR_W*LSUS];
+            assign w_chan_virt_addr[i] = wi_virt_addr[i*VADDR_W +: VADDR_W];
+            assign w_chan_sub_virt_addr[i] = wi_sub_virt_addr[i*ASSOC_W*SUBS +: ASSOC_W*SUBS];
             
-            assign wo_mem_addr[i*PADDR_W*LSUS +: PADDR_W*LSUS] = w_chan_paddr[i];
+            assign wo_mem_addr[i*PADDR_W +: PADDR_W] = w_chan_paddr[i];
+            assign wo_mem_sub_addr[i*PADDR_W*SUBS +: PADDR_W*SUBS] = w_chan_sub_paddr[i];
+            assign wo_mem_update[i] = w_chan_update[i];
             
+            (* dont_touch = "yes" *)
             address_translator #(
-                .LSUS(LSUS),
+                .SUBS(SUBS),
                 .BLOCKS(BLOCKS),
                 .BLOCK_D(BLOCK_D),
                 .BLOCK_W(BLOCK_W),
@@ -259,17 +287,19 @@ module quick_page #(
                 .VADDR_W(VADDR_W),            // Address (Block_sel + obj_start loc + obj_offset) | OBJ_start = startign phy_addr
                 .LSU_VADDR_W(LSU_VADDR_W),
                 .PADDR_W(PADDR_W),
-                .ROW_LATENCY(ROW_ADDR_LATENCY)
+                .ASSOC_D(ASSOC_D),
+                .ASSOC_W(ASSOC_W)
             ) addr_trans_i (
                 .i_clk(i_clk),
                 .i_reset(i_reset),
                 .i_scb(w_chan_rd_scb[i]),                  // SCBs of selected block
-                //.i_lsu_we(),               // Write enable signal for each lsu channel
                 .i_chan_vaddr(w_chan_virt_addr[i]),            // Only LSU[0]'s blk_sel is used, rest ignored
+                .i_chan_svaddr(w_chan_sub_virt_addr[i]),
                 
+                .o_trans_update(w_chan_update[i]),
                 .o_blk_addr(w_chan_scb_addr[i]),             // Block select address to scb file
-                //.o_lsu_we(),               // Write enable sig towards memory for each lsu channel
-                .o_lsu_paddr(w_chan_paddr[i])             // Translated addresses towards memory
+                .o_lsu_paddr(w_chan_paddr[i]),            // Translated addresses towards memory
+                .o_lsu_spaddr(w_chan_sub_paddr[i])
             );
         end
     endgenerate

@@ -46,7 +46,6 @@ module scb_file #(
     wire    [DATA_W-1:0]                    w_chan_data[0:CHANS-1];
     wire    [DATA_W-1:0]                    w_rd_data;
     
-    //reg     [DATA_W-1:0]                    r_rd_data;
     reg     [DATA_W-1:0]                    r_scb[0:BLOCKS-1];
     
     genvar i;
@@ -56,7 +55,6 @@ module scb_file #(
     assign w_we = i_we << i_wr_addr;
     assign w_rd_data = r_scb[i_rd_addr];
     
-    //assign o_rd_data = r_rd_data;
     assign o_rd_data = w_rd_data;
     
     generate
@@ -72,13 +70,5 @@ module scb_file #(
             r_scb[k] <= (i_reset) ? 0 : (w_we[k]) ? i_wr_data : r_scb[k];
         end
     end
-    
-    //initial begin
-    //    r_rd_data = 0;
-    //end
-    
-    //always @(posedge i_clk) begin
-    //    r_rd_data <= w_rd_data;
-    //end
     
 endmodule
