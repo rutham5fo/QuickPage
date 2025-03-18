@@ -14,8 +14,8 @@ memory framework that supports:\
 &emsp; (1) Low latency allocation with O(1) time complexity (3 cycles for valid reply, pipelined).\
 &emsp; (2) Low latency deallocation with O(1) time complexity (5 cycles for valid reply, pipelined).\
 &emsp; (3) Low latency virtual to physical address translation. This metric is a bit tricky to quantify,  
-&emsp;&emsp;&nbsp; at the moment the translator is capable of supporting 1~2 cycle latency for translating addresses  
-&emsp;&emsp;&nbsp; within a block (a set of frames), plus the added single cycle latency to switch between blocks.\
+&emsp;&emsp;&nbsp; at the moment the translator is capable of supporting 0~2 cycle latency for translating addresses  
+&emsp;&emsp;&nbsp; within a block (a group of frames), plus the added single cycle latency to switch between blocks.\
 &emsp; (4) Support for multiple concurrent translation ports that are scalable, to support multiple PUs.
 
 ## Concept
