@@ -44,7 +44,7 @@ explained below along with I/O in the following tables.
 | LINE_S            | Size of an allocable pages/lines in bytes.                                                              |
 | MEM_D             | Total heap memory depth, i.e., the total number of allocable lines/frames in the heap.                  |
 | BLOCK_D           | Total number of lines per block, i.e., the span of lines over which an object may be<br/> dynamically allocated. This parameter controls the size of the inverse butterfly structure. |
-| ROW_ADDR_LATENCY  | Adjust the translation latency of all channels and sub-channels (valid values are 1 and 2).             |
+| ASSOC_D		    | Sets the associativity of the address translation channel(s). This governs the boundary within a set, in which the page addresses may be translated with 0 latency.                   |
 
 The following are *non-mutable* parameters which are automatically derived from the above parameter values.
 
@@ -53,6 +53,7 @@ The following are *non-mutable* parameters which are automatically derived from 
 | BLOCK_W           | Bit length to represent BLOCK_D.                                                                        |
 | BLOCKS            | Total number of blocks present in MEM_D, where each block consists of BLOCK_D lines.                    |
 | BLOCK_L           | Bit length to represent BLOCKS.                                                                         |
+| ASSOC_W			| Bit length to represent ASSOC_D.																		  |
 | REQ_S             | Maximum allocable request size of an object in bytes.                                                   |
 | REQ_W             | Bit length to represent REQ_S (inclusive).                                                              |
 | REP_W             | Bit length to reprsent the reply from QuickPage after a successful allocation. The reply from<br/> QuickPage is formated as \[Number of allocated lines, Block number, Base address, offset (init to 0)\].<br/> This is also the Object ID used to identify the object during deallocation. Hence must be stored by PU.                               |
@@ -78,10 +79,10 @@ The following are *non-mutable* parameters which are automatically derived from 
 
 ### Performance Metrics
 
-| Metric                           | Description / Value                                                                      |
-| :------------------------------- | :--------------------------------------------------------------------------------------- |
-| Allocation Latency               | Time required to perform an allocation and reply with a valid Object ID. 3 cycles.       |
-| Deallocation Latency             | Time required to perform a deallocation given a valid Ojbect ID. 5 cycles.               |
-| Translator Block switch Latency  | Time required by a channel to load a block for translation (the block select is<br/> controlled by sub-channel 0 in each channel, rest of the sub-channels are forced to<br/> translate within the same block). 1 cycle.                                                                                                              |
-| Translator Object switch Latency | The time required to obtain the base address of an object within a block. 1 cycle.       |
-| Translator Row switch Latency    | The time required to obtain the physical frame address. 1~2 cycles.                      |
+| Metric                           		| Description / Value                                                                      					|
+| :------------------------------------ | :-------------------------------------------------------------------------------------------------------- |
+| Allocation Latency               		| Time required to perform an allocation and reply with a valid Object ID. 3 cycles.       					|
+| Deallocation Latency             		| Time required to perform a deallocation given a valid Ojbect ID. 5 cycles.               					|
+| Translator Block switch Latency  		| Time required by a channel to load a block for translation (the block select is<br/> controlled by sub-channel 0 in each channel, rest of the sub-channels are forced to<br/> translate within the same block). 3 cycles.                                                                                                              |
+| Translator Set/Object switch Latency  | The time required to obtain the base address of an object within a block. 2 cycles.       				|
+| Translator Row/Line switch Latency	| The time required to obtain the physical frame address (within a set of the current block). 0 cycles.		|
